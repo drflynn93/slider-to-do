@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slider — Time Block Planner</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f3ee;
+    --surface: #ffffff;
+    --border: #e0ddd6;
+    --border-soft: #ede9e2;
+    --text: #1a1917;
+    --text-muted: #6b6860;
+    --text-faint: #a8a49e;
+    --green-bg: #e8f5e0;
+    --green-border: #a3d17e;
+    --green-text: #2d6a1f;
+    --green-mid: #4d9e2f;
+    --amber-bg: #fdf3dc;
+    --amber-text: #8a5a00;
+    --red-bg: #fdecea;
+    --red-text: #c0392b;
+    --accent: #3d5a3e;
+    --accent-light: #e8f0e8;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  h1.app-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+  }
+
+  .app {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* ---- SETUP SCREEN ---- */
+  .setup-screen {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+  }
+  .setup-screen h2 {
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .setup-screen p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+  }
+  .hour-picker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 1.5rem;
+  }
+  .hour-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text);
+    transition: background .15s;
+    line-height: 1;
+  }
+  .hour-btn:hover { background: var(--bg); }
+  .hour-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 42px;
+    font-weight: 500;
+    min-width: 80px;
+    text-align: center;
+  }
+  .hour-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: -4px;
+  }
+  .start-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 32px;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+  }
+  .start-btn:hover { opacity: .88; }
+  .start-btn:active { transform: scale(.97); }
+
+  /* ---- HEADER ---- */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+  }
+  .timer-clock {
+    font-family: 'DM Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    min-width: 90px;
+    color: var(--text);
+  }
+  .timer-clock.warn { color: var(--amber-text); }
+  .timer-clock.danger { color: var(--red-text); }
+  .timer-track {
+    flex: 1;
+    height: 5px;
+    background: var(--border-soft);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .timer-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--green-mid);
+    transition: width 1s linear, background .5s;
+  }
+  .timer-fill.warn { background: #d4820a; }
+  .timer-fill.danger { background: #c0392b; }
+  .reset-link {
+    font-size: 12px;
+    color: var(--text-faint);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: 'DM Sans', sans-serif;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color .15s, background .15s;
+  }
+  .reset-link:hover { color: var(--text-muted); background: var(--bg); }
+
+  /* ---- PROGRESS ---- */
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .progress-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    min-width: 36px;
+  }
+  .progress-track {
+    flex: 1;
+    height: 3px;
+    background: var(--border-soft);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green-mid);
+    border-radius: 2px;
+    transition: width .4s ease;
+  }
+  .progress-label {
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  /* ---- ADD ROW ---- */
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1.25rem;
+  }
+  .add-input {
+    flex: 1;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+  }
+  .add-input:focus { border-color: var(--accent); }
+  .add-input::placeholder { color: var(--text-faint); }
+  .add-task-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s;
+    white-space: nowrap;
+  }
+  .add-task-btn:hover { opacity: .85; }
+
+  /* ---- COLUMNS ---- */
+  .cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 1.5rem;
+  }
+  .col-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .col-count {
+    background: var(--border-soft);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .col-drop {
+    min-height: 220px;
+    border-radius: 12px;
+    border: 1.5px dashed var(--border);
+    padding: 8px;
+    transition: background .15s, border-color .15s;
+  }
+  .col-drop.over {
+    background: var(--accent-light);
+    border-color: var(--accent);
+  }
+
+  /* ---- TASK BLOCK ---- */
+  .task-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    cursor: grab;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    transition: box-shadow .12s, opacity .15s, transform .12s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .task-block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+  .task-block:active { cursor: grabbing; }
+  .task-block.dragging { opacity: .35; transform: scale(.97); }
+  .task-block.done {
+    background: var(--green-bg);
+    border-color: var(--green-border);
+  }
+  .handle {
+    color: var(--text-faint);
+    font-size: 13px;
+    padding-top: 1px;
+    flex-shrink: 0;
+    cursor: grab;
+    line-height: 1.4;
+  }
+  .task-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .task-block.done .task-text {
+    color: var(--green-text);
+    text-decoration: line-through;
+    text-decoration-color: var(--green-border);
+  }
+  .priority-pill {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    white-space: nowrap;
+  }
+  .pill-top { background: #fdecea; color: #a32d2d; }
+  .pill-low { background: #f0f0f0; color: #888; }
+  .check-icon {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .task-block.done .delete-btn { display: none; }
+  .delete-btn {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+  .task-block:hover .delete-btn { opacity: 1; }
+  .delete-btn:hover { color: #c0392b; }
+
+  /* ---- EOD PANEL ---- */
+  .eod-panel {
+    background: var(--surface);
+    border: 1px solid var(--green-border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-top: .5rem;
+  }
+  .eod-panel h3 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--green-text);
+    margin-bottom: 4px;
+  }
+  .eod-panel p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .reorder-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: grab;
+    font-size: 13px;
+    color: var(--text);
+    transition: background .12s;
+    user-select: none;
+  }
+  .reorder-item.over-reorder { background: var(--accent-light); border-color: var(--accent); }
+  .reorder-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    min-width: 16px;
+  }
+  .lock-btn {
+    margin-top: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s;
+  }
+  .lock-btn:hover { opacity: .85; }
+
+  .task-block * { pointer-events: none; }
+  .delete-btn { pointer-events: auto; }
+  .ghost-drop {
+    height: 40px;
+    border-radius: 8px;
+    background: var(--accent-light);
+    border: 1.5px dashed var(--accent);
+    margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1 class="app-title">Slider</h1>
+
+  <!-- SETUP -->
+  <div class="setup-screen" id="setup-screen">
+    <h2>How long is your session?</h2>
+    <p>Set a countdown and get to work. Slide tasks right when done.</p>
+    <div class="hour-picker">
+      <button class="hour-btn" onclick="adjustHours(-1)">&#8722;</button>
+      <div>
+        <div class="hour-display" id="hour-display">8</div>
+        <div class="hour-label">hours</div>
+      </div>
+      <button class="hour-btn" onclick="adjustHours(1)">+</button>
+    </div>
+    <button class="start-btn" onclick="startSession()">Start session</button>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main-view" style="display:none">
+    <div class="header">
+      <div class="timer-clock" id="timer-clock">8:00:00</div>
+      <div class="timer-track"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+      <button class="reset-link" onclick="resetApp()">reset</button>
+    </div>
+
+    <div class="progress-row">
+      <div class="progress-pct" id="progress-pct">0%</div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="progress-label">0 of 0 done</div>
+    </div>
+
+    <div class="add-row">
+      <input class="add-input" id="new-task" type="text" placeholder="What needs to get done?" onkeydown="if(event.key==='Enter')addTask()" />
+      <button class="add-task-btn" onclick="addTask()">+ Add</button>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="col-label">To do <span class="col-count" id="todo-count">0</span></div>
+        <div class="col-drop" id="todo-col"
+          ondragover="colDragOver(event,'todo')"
+          ondragleave="colDragLeave(event)"
+          ondrop="colDrop(event,'todo')"></div>
+      </div>
+      <div>
+        <div class="col-label">Done <span class="col-count" id="done-count">0</span></div>
+        <div class="col-drop" id="done-col"
+          ondragover="colDragOver(event,'done')"
+          ondragleave="colDragLeave(event)"
+          ondrop="colDrop(event,'done')"></div>
+      </div>
+    </div>
+
+    <div id="eod-panel" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+let sessionHours = 8;
+let tasks = [];
+let nextId = 1;
+let totalSecs = 0;
+let remainSecs = 0;
+let timerInterval = null;
+let dragId = null;
+let eodShown = false;
+let reorderList = [];
+
+function adjustHours(delta) {
+  sessionHours = Math.min(24, Math.max(1, sessionHours + delta));
+  document.getElementById('hour-display').textContent = sessionHours;
+}
+
+function playClick() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(1046, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(523, ac.currentTime + 0.05);
+    g.gain.setValueAtTime(0.3, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.12);
+    o.start(); o.stop(ac.currentTime + 0.12);
+  } catch(e) {}
+}
+
+function startSession() {
+  totalSecs = sessionHours * 3600;
+  remainSecs = totalSecs;
+  eodShown = false;
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('main-view').style.display = 'block';
+  document.getElementById('eod-panel').style.display = 'none';
+  updateTimer();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(tick, 1000);
+  render();
+}
+
+function resetApp() {
+  if (timerInterval) clearInterval(timerInterval);
+  document.getElementById('setup-screen').style.display = 'block';
+  document.getElementById('main-view').style.display = 'none';
+  eodShown = false;
+}
+
+function tick() {
+  if (remainSecs <= 0) { clearInterval(timerInterval); showEOD(); return; }
+  remainSecs--;
+  updateTimer();
+}
+
+function updateTimer() {
+  const h = Math.floor(remainSecs / 3600);
+  const m = Math.floor((remainSecs % 3600) / 60);
+  const s = remainSecs % 60;
+  const display = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  const pct = remainSecs / totalSecs * 100;
+  const clock = document.getElementById('timer-clock');
+  const fill = document.getElementById('timer-fill');
+  clock.textContent = display;
+  fill.style.width = pct + '%';
+  const cls = pct < 25 ? 'danger' : pct < 50 ? 'warn' : '';
+  clock.className = 'timer-clock' + (cls ? ' ' + cls : '');
+  fill.className = 'timer-fill' + (cls ? ' ' + cls : '');
+}
+
+function addTask() {
+  const inp = document.getElementById('new-task');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  tasks.push({ id: nextId++, text: txt, done: false });
+  inp.value = '';
+  render();
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  render();
+}
+
+function render() {
+  const todo = tasks.filter(t => !t.done);
+  const done = tasks.filter(t => t.done);
+  document.getElementById('todo-count').textContent = todo.length;
+  document.getElementById('done-count').textContent = done.length;
+  const total = tasks.length;
+  const pct = total ? Math.round(done.length / total * 100) : 0;
+  document.getElementById('progress-pct').textContent = pct + '%';
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${done.length} of ${total} done`;
+
+  const tc = document.getElementById('todo-col');
+  const dc = document.getElementById('done-col');
+  tc.innerHTML = ''; dc.innerHTML = '';
+
+  todo.forEach((t, i) => {
+    let pill = null;
+    if (todo.length > 1) {
+      if (i === 0) pill = { label: 'top priority', cls: 'pill-top' };
+      else if (i === todo.length - 1) pill = { label: 'low priority', cls: 'pill-low' };
+    }
+    tc.appendChild(makeBlock(t, pill));
+  });
+  done.forEach(t => dc.appendChild(makeBlock(t, null)));
+}
+
+function makeBlock(t, pill) {
+  const el = document.createElement('div');
+  el.className = 'task-block' + (t.done ? ' done' : '');
+  el.draggable = true;
+  el.dataset.id = t.id;
+
+  el.innerHTML =
+    `<span class="handle">&#9776;</span>` +
+    (pill ? `<span class="priority-pill ${pill.cls}">${pill.label}</span>` : '') +
+    (t.done ? `<svg class="check-icon" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="#4d9e2f"/><path d="M4.5 8.5l2.5 2.5 4.5-4.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>` : '') +
+    `<span class="task-text">${esc(t.text)}</span>` +
+    (!t.done ? `<button class="delete-btn" onclick="deleteTask(${t.id})" title="Remove">&#215;</button>` : '');
+
+  el.addEventListener('dragstart', e => {
+    dragId = t.id;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => el.classList.add('dragging'), 0);
+  });
+  el.addEventListener('dragend', () => {
+    dragId = null;
+    el.classList.remove('dragging');
+    removeGhost();
+  });
+  return el;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
+}
+
+function getGhost() {
+  let g = document.getElementById('drag-ghost');
+  if (!g) { g = document.createElement('div'); g.id = 'drag-ghost'; g.className = 'ghost-drop'; }
+  return g;
+}
+function removeGhost() { const g = document.getElementById('drag-ghost'); if (g) g.remove(); }
+
+function getDragAfter(col, y) {
+  const els = [...col.querySelectorAll('.task-block:not(.dragging)')];
+  return els.find(el => { const r = el.getBoundingClientRect(); return y < r.top + r.height / 2; }) || null;
+}
+
+function colDragOver(e, col) {
+  e.preventDefault();
+  const colEl = document.getElementById(col + '-col');
+  colEl.classList.add('over');
+  if (col === 'todo') {
+    const after = getDragAfter(colEl, e.clientY);
+    const ghost = getGhost();
+    if (after) colEl.insertBefore(ghost, after);
+    else colEl.appendChild(ghost);
+  }
+}
+function colDragLeave(e) {
+  e.currentTarget.classList.remove('over');
+  const g = document.getElementById('drag-ghost');
+  if (g && e.currentTarget.contains(g) && !e.currentTarget.contains(e.relatedTarget)) {
+    g.remove();
+  }
+}
+
+function colDrop(e, targetCol) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  removeGhost();
+  if (!dragId) return;
+  const task = tasks.find(t => t.id === dragId);
+  if (!task) return;
+  const wasNotDone = !task.done;
+  task.done = (targetCol === 'done');
+  if (wasNotDone && task.done) playClick();
+
+  if (targetCol === 'todo') {
+    const col = document.getElementById('todo-col');
+    const after = getDragAfter(col, e.clientY);
+    const others = tasks.filter(t => !t.done && t.id !== task.id);
+    if (after) {
+      const idx = others.findIndex(t => t.id === parseInt(after.dataset.id));
+      others.splice(idx, 0, task);
+    } else { others.push(task); }
+    tasks = [...others, ...tasks.filter(t => t.done)];
+  }
+
+  render();
+  if (tasks.length > 0 && tasks.every(t => t.done) && !eodShown) showEOD();
+}
+
+function showEOD() {
+  if (eodShown) return;
+  eodShown = true;
+  const incomplete = tasks.filter(t => !t.done);
+  const panel = document.getElementById('eod-panel');
+  if (incomplete.length === 0) {
+    panel.innerHTML = `<div class="eod-panel"><h3>Session complete &#10003;</h3><p>You finished everything. Great work today.</p></div>`;
+  } else {
+    panel.innerHTML = `
+      <div class="eod-panel">
+        <h3>Session over — ${incomplete.length} task${incomplete.length > 1 ? 's' : ''} remaining</h3>
+        <p>Drag to set tomorrow's priority order. Top of the list = first thing you tackle.</p>
+        <div id="reorder-list"></div>
+        <button class="lock-btn" onclick="lockReorder()">Lock in order for tomorrow</button>
+      </div>`;
+    reorderList = incomplete.map(t => ({ ...t }));
+    renderReorder();
+  }
+  panel.style.display = 'block';
+}
+
+function renderReorder() {
+  const el = document.getElementById('reorder-list');
+  if (!el) return;
+  el.innerHTML = '';
+  reorderList.forEach((t, i) => {
+    const div = document.createElement('div');
+    div.className = 'reorder-item';
+    div.draggable = true;
+    div.dataset.rid = t.id;
+    div.innerHTML = `<span class="handle" style="font-size:12px">&#9776;</span><span class="reorder-num">${i + 1}</span><span style="flex:1">${esc(t.text)}</span>`;
+    div.addEventListener('dragstart', e => e.dataTransfer.setData('rid', t.id));
+    div.addEventListener('dragover', e => { e.preventDefault(); div.classList.add('over-reorder'); });
+    div.addEventListener('dragleave', () => div.classList.remove('over-reorder'));
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      div.classList.remove('over-reorder');
+      const fromId = parseInt(e.dataTransfer.getData('rid'));
+      if (fromId === t.id) return;
+      const fi = reorderList.findIndex(x => x.id === fromId);
+      const ti = reorderList.findIndex(x => x.id === t.id);
+      const [moved] = reorderList.splice(fi, 1);
+      reorderList.splice(ti, 0, moved);
+      renderReorder();
+    });
+    el.appendChild(div);
+  });
+}
+
+function lockReorder() {
+  tasks = reorderList.map(t => ({ ...t, done: false }));
+  eodShown = false;
+  document.getElementById('eod-panel').style.display = 'none';
+  resetApp();
+}
+</script>
+</body>
+</html>
