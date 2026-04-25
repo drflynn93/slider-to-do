@@ -579,6 +579,12 @@ function render() {
   done.forEach(t => dc.appendChild(makeBlock(t, null)));
 }
 
+// ---- TOUCH DRAG STATE ----
+let touchDragId = null;
+let touchClone = null;
+let touchOffsetX = 0;
+let touchOffsetY = 0;
+
 function makeBlock(t, pill) {
   const el = document.createElement('div');
   el.className = 'task-block' + (t.done ? ' done' : '');
@@ -592,6 +598,7 @@ function makeBlock(t, pill) {
     `<span class="task-text">${esc(t.text)}</span>` +
     (!t.done ? `<button class="delete-btn" onclick="deleteTask(${t.id})" title="Remove">&#215;</button>` : '');
 
+  // Mouse drag
   el.addEventListener('dragstart', e => {
     dragId = t.id;
     e.dataTransfer.effectAllowed = 'move';
@@ -602,6 +609,114 @@ function makeBlock(t, pill) {
     el.classList.remove('dragging');
     removeGhost();
   });
+
+  // Touch drag
+  el.addEventListener('touchstart', e => {
+    const touch = e.touches[0];
+    touchDragId = t.id;
+    const rect = el.getBoundingClientRect();
+    touchOffsetX = touch.clientX - rect.left;
+    touchOffsetY = touch.clientY - rect.top;
+
+    // Create floating clone
+    touchClone = el.cloneNode(true);
+    touchClone.style.cssText = `
+      position: fixed;
+      left: ${rect.left}px;
+      top: ${rect.top}px;
+      width: ${rect.width}px;
+      opacity: 0.85;
+      pointer-events: none;
+      z-index: 9999;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+      transform: scale(1.03);
+      transition: transform .1s;
+    `;
+    document.body.appendChild(touchClone);
+    el.classList.add('dragging');
+  }, { passive: true });
+
+  el.addEventListener('touchmove', e => {
+    if (touchDragId === null) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const x = touch.clientX - touchOffsetX;
+    const y = touch.clientY - touchOffsetY;
+    if (touchClone) {
+      touchClone.style.left = x + 'px';
+      touchClone.style.top = y + 'px';
+    }
+
+    // Highlight target column
+    const todoCol = document.getElementById('todo-col');
+    const doneCol = document.getElementById('done-col');
+    const tr = todoCol.getBoundingClientRect();
+    const dr = doneCol.getBoundingClientRect();
+    todoCol.classList.remove('over');
+    doneCol.classList.remove('over');
+
+    const cx = touch.clientX;
+    const cy = touch.clientY;
+
+    if (cx >= dr.left && cx <= dr.right && cy >= dr.top && cy <= dr.bottom) {
+      doneCol.classList.add('over');
+      removeGhost();
+    } else if (cx >= tr.left && cx <= tr.right && cy >= tr.top && cy <= tr.bottom) {
+      todoCol.classList.add('over');
+      const after = getDragAfter(todoCol, cy);
+      const ghost = getGhost();
+      if (after) todoCol.insertBefore(ghost, after);
+      else todoCol.appendChild(ghost);
+    } else {
+      removeGhost();
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    if (touchDragId === null) return;
+    const touch = e.changedTouches[0];
+    const cx = touch.clientX;
+    const cy = touch.clientY;
+
+    // Clean up clone and state
+    if (touchClone) { touchClone.remove(); touchClone = null; }
+    const origEl = document.querySelector(`.task-block[data-id="${touchDragId}"]`);
+    if (origEl) origEl.classList.remove('dragging');
+
+    const todoCol = document.getElementById('todo-col');
+    const doneCol = document.getElementById('done-col');
+    todoCol.classList.remove('over');
+    doneCol.classList.remove('over');
+    removeGhost();
+
+    const dr = doneCol.getBoundingClientRect();
+    const tr = todoCol.getBoundingClientRect();
+
+    const task = tasks.find(t => t.id === touchDragId);
+    if (!task) { touchDragId = null; return; }
+
+    if (cx >= dr.left && cx <= dr.right && cy >= dr.top && cy <= dr.bottom) {
+      // Drop on done
+      const wasNotDone = !task.done;
+      task.done = true;
+      if (wasNotDone) playClick();
+      render();
+      if (tasks.length > 0 && tasks.every(t => t.done) && !eodShown) showEOD();
+    } else if (cx >= tr.left && cx <= tr.right && cy >= tr.top && cy <= tr.bottom) {
+      // Reorder in todo
+      task.done = false;
+      const after = getDragAfter(todoCol, cy);
+      const others = tasks.filter(t2 => !t2.done && t2.id !== task.id);
+      if (after) {
+        const idx = others.findIndex(t2 => t2.id === parseInt(after.dataset.id));
+        others.splice(Math.max(idx, 0), 0, task);
+      } else { others.push(task); }
+      tasks = [...others, ...tasks.filter(t2 => t2.done)];
+      render();
+    }
+    touchDragId = null;
+  }, { passive: true });
+
   return el;
 }
 
@@ -699,6 +814,7 @@ function renderReorder() {
     div.draggable = true;
     div.dataset.rid = t.id;
     div.innerHTML = `<span class="handle" style="font-size:12px">&#9776;</span><span class="reorder-num">${i + 1}</span><span style="flex:1">${esc(t.text)}</span>`;
+    // Mouse drag for reorder
     div.addEventListener('dragstart', e => e.dataTransfer.setData('rid', t.id));
     div.addEventListener('dragover', e => { e.preventDefault(); div.classList.add('over-reorder'); });
     div.addEventListener('dragleave', () => div.classList.remove('over-reorder'));
@@ -713,6 +829,50 @@ function renderReorder() {
       reorderList.splice(ti, 0, moved);
       renderReorder();
     });
+
+    // Touch drag for reorder
+    let rTouchId = null, rClone = null, rOffX = 0, rOffY = 0;
+    div.addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      rTouchId = t.id;
+      const rect = div.getBoundingClientRect();
+      rOffX = touch.clientX - rect.left;
+      rOffY = touch.clientY - rect.top;
+      rClone = div.cloneNode(true);
+      rClone.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;opacity:.8;pointer-events:none;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.15);`;
+      document.body.appendChild(rClone);
+      div.style.opacity = '.3';
+    }, { passive: true });
+    div.addEventListener('touchmove', e => {
+      if (!rTouchId) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      if (rClone) { rClone.style.left = (touch.clientX - rOffX) + 'px'; rClone.style.top = (touch.clientY - rOffY) + 'px'; }
+      // Highlight target
+      document.querySelectorAll('.reorder-item').forEach(ri => ri.classList.remove('over-reorder'));
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.reorder-item');
+      if (target && target !== div) target.classList.add('over-reorder');
+    }, { passive: false });
+    div.addEventListener('touchend', e => {
+      if (!rTouchId) return;
+      if (rClone) { rClone.remove(); rClone = null; }
+      div.style.opacity = '';
+      document.querySelectorAll('.reorder-item').forEach(ri => ri.classList.remove('over-reorder'));
+      const touch = e.changedTouches[0];
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.reorder-item');
+      if (target && target.dataset.rid) {
+        const toId = parseInt(target.dataset.rid);
+        if (toId !== rTouchId) {
+          const fi = reorderList.findIndex(x => x.id === rTouchId);
+          const ti = reorderList.findIndex(x => x.id === toId);
+          const [moved] = reorderList.splice(fi, 1);
+          reorderList.splice(ti, 0, moved);
+          renderReorder();
+        }
+      }
+      rTouchId = null;
+    }, { passive: true });
+
     el.appendChild(div);
   });
 }
